@@ -76,8 +76,7 @@ class File(metaclass=abc.ABCMeta):
             return any(fnmatch.fnmatch(filename, p) for p in patterns)
 
         for f in os.listdir(self.encoded):
-            f = f.decode(self.encoding, 'surrogateescape')
-            f = type(self)(os.path.join(str(self), f), self.encoding)
+            f = self.join(f.decode(self.encoding, 'surrogateescape'))
             m = str(f) + os.sep if f.isdir else str(f)
 
             if not xfnmatch(m, include):
