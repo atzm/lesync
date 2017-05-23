@@ -65,7 +65,11 @@ class File(metaclass=abc.ABCMeta):
 
     @property
     def stat0(self):
-        return os.stat_result((0,) * 10)
+        return os.stat_result((-1,) * 10)
+
+    @property
+    def errnoignore(self):
+        return []
 
     @property
     def isdir(self):
@@ -82,29 +86,16 @@ class File(metaclass=abc.ABCMeta):
     def open(self, mode=0o0644):
         try:
             self.fileno = os.open(self.encoded, self.openflag, mode)
+            fcntl.flock(self.fileno, self.lockmode | fcntl.LOCK_NB)
             yield self
-
         except OSError as e:
-            if e.errno != errno.ENOENT:
+            if e.errno not in self.errnoignore:
                 raise
             yield self
-
         finally:
             if self.opened:
                 os.close(self.fileno)
                 self.fileno = -1
-
-    def lock(self):
-        try:
-            if self.opened:
-                fcntl.flock(self.fileno, self.lockmode | fcntl.LOCK_NB)
-            return True
-
-        except OSError as e:
-            if e.errno != errno.EAGAIN:
-                raise
-
-        return False
 
     def seek(self, *args, **kwargs):
         if self.opened:
@@ -158,6 +149,12 @@ class FileRDWR(File):
                 raise
 
 
+class FileStat(FileRD):
+    @property
+    def errnoignore(self):
+        return [errno.ENOENT]
+
+
 @contextlib.contextmanager
 def umask(mask):
     try:
@@ -170,22 +167,15 @@ def umask(mask):
 
 
 def copy(args, src, dst):
-    with src.open():
-        if not src.lock():
-            return logging.warning('could not be locked: %s', src)
+    with src.open(), dst.open(src.stat.st_mode & 0o0777):
+        if args.sync and src == dst:
+            return logging.debug('skipped: %s', src)
 
-        with dst.open(src.stat.st_mode & 0o0777):
-            if not dst.lock():
-                return logging.warning('could not be locked: %s', dst)
+        dst.seek(0, 0)
+        dst.truncate(0)
+        src.copy(dst)
 
-            if args.sync and src == dst:
-                return logging.debug('skipped: %s', src)
-
-            dst.seek(0, 0)
-            dst.truncate(0)
-            src.copy(dst)
-
-            logging.info('copied: %s', src)
+        logging.info('copied: %s', src)
 
 
 def xfnmatch(path, patterns):
@@ -205,9 +195,6 @@ def walk(args, src, dst):
         return copy(args, src, dst)
 
     with src.open():
-        if not src.lock():  # XXX
-            return logging.warning('could not be locked: %s', src)
-
         dst.mkdir(src.stat.st_mode & 0o0777)
 
         for s in src.iterdir():
@@ -232,7 +219,7 @@ def run(args):
 
 def prepare(args):
     args.reader = FileRD
-    args.writer = FileRD if args.dry_run else FileRDWR
+    args.writer = FileStat if args.dry_run else FileRDWR
 
     if args.verbose > 1:
         loglevel = logging.DEBUG
