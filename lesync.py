@@ -71,20 +71,9 @@ class File(metaclass=abc.ABCMeta):
     def isdir(self):
         return os.path.isdir(self.encoded)
 
-    def iterdir(self, include=['*/', '*'], exclude=[]):
-        def xfnmatch(filename, patterns):
-            return any(fnmatch.fnmatch(filename, p) for p in patterns)
-
+    def iterdir(self):
         for f in os.listdir(self.encoded):
-            f = self.join(f.decode(self.encoding, 'surrogateescape'))
-            m = str(f) + os.sep if f.isdir else str(f)
-
-            if not xfnmatch(m, include):
-                continue
-            if xfnmatch(m, exclude):
-                continue
-
-            yield f
+            yield self.join(f.decode(self.encoding, 'surrogateescape'))
 
     def join(self, f):
         return type(self)(os.path.join(str(self), f), self.encoding)
@@ -199,7 +188,16 @@ def copy(args, src, dst):
             logging.info('copied: %s', src)
 
 
+def xfnmatch(path, patterns):
+    return any(fnmatch.fnmatch(path, p) for p in patterns)
+
+
 def walk(args, src, dst):
+    match = str(src) + os.sep if src.isdir else str(src)
+
+    if not xfnmatch(match, args.include) or xfnmatch(match, args.exclude):
+        return logging.debug('skipped: %s', src)
+
     if dst.isdir:
         dst = dst.join(src.basename)
 
@@ -212,7 +210,7 @@ def walk(args, src, dst):
 
         dst.mkdir(src.stat.st_mode & 0o0777)
 
-        for s in src.iterdir(args.include, args.exclude):
+        for s in src.iterdir():
             walk(args, s, dst)
 
 
