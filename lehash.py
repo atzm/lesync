@@ -45,31 +45,38 @@ class HashDescriptor:
 
 class Hash:
     AF_ALG = 38
+    SOL_ALG = 279
+    ALG_SET_KEY = 1
+
     ALG_TYPE = b'hash'
     ALG_NAME = None
     ALG_BYTE = None
 
     def __init__(self):
-        svsk = socket.socket(self.AF_ALG, socket.SOCK_SEQPACKET, 0)
+        sock = socket.socket(self.AF_ALG, socket.SOCK_SEQPACKET, 0)
         algo = _sockaddr_alg(self.AF_ALG, self.ALG_TYPE, 0, 0, self.ALG_NAME)
 
-        r = _libc.bind(svsk.fileno(), ctypes.byref(algo), ctypes.sizeof(algo))
+        r = _libc.bind(sock.fileno(), ctypes.byref(algo), ctypes.sizeof(algo))
         if r < 0:
             n = ctypes.get_errno()
-            svsk.close()
+            sock.close()
             raise OSError(n, os.strerror(n))
 
-        self.svsk = svsk
+        self.sock = self.prepare(sock)
         self.algo = algo
 
     def __del__(self):
-        if self.svsk:
-            self.svsk.close()
+        if getattr(self, 'sock', None):
+            self.sock.close()
+
+    @classmethod
+    def prepare(cls, sock):
+        return sock
 
     @contextlib.contextmanager
     def open(self):
         try:
-            fileno = _libc.accept(self.svsk.fileno(), None, None)
+            fileno = _libc.accept(self.sock.fileno(), None, None)
             if fileno < 0:
                 n = ctypes.get_errno()
                 raise OSError(n, os.strerror(n))
@@ -89,6 +96,22 @@ class Hash:
             d.update(c.algorithm())
             d[c.ALG_NAME.decode()] = c
         return d
+
+
+class HashCRC32C(Hash):
+    ALG_NAME = b'crc32c'
+    ALG_BYTE = 4
+
+    @classmethod
+    def prepare(cls, sock):
+        r = _libc.setsockopt(sock.fileno(), cls.SOL_ALG, cls.ALG_SET_KEY,
+                             b'\xff' * cls.ALG_BYTE, cls.ALG_BYTE)
+        if r < 0:
+            n = ctypes.get_errno()
+            sock.close()
+            raise OSError(n, os.strerror(n))
+
+        return sock
 
 
 class HashMD5(Hash):
@@ -114,7 +137,7 @@ class HashSHA256(Hash):
 def main():
     digs = sorted(Hash.algorithm().keys())
     argp = argparse.ArgumentParser()
-    argp.add_argument('-a', '--algorithm', choices=digs, default='md5')
+    argp.add_argument('-a', '--algorithm', choices=digs, default='crc32c')
     argp.add_argument('files', nargs=argparse.REMAINDER)
     args = argp.parse_args()
 
