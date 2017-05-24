@@ -86,7 +86,7 @@ class Hash:
     def algorithm(cls):
         d = {}
         for c in cls.__subclasses__():
-            d.update(c.__subclasses__())
+            d.update(c.algorithm())
             d[c.ALG_NAME.decode()] = c
         return d
 
@@ -112,9 +112,9 @@ class HashSHA256(Hash):
 
 
 def main():
-    digs = Hash.algorithm()
+    digs = sorted(Hash.algorithm().keys())
     argp = argparse.ArgumentParser()
-    argp.add_argument('-a', '--algorithm', choices=digs.keys(), default='md5')
+    argp.add_argument('-a', '--algorithm', choices=digs, default='md5')
     argp.add_argument('files', nargs=argparse.REMAINDER)
     args = argp.parse_args()
 
