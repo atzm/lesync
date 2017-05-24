@@ -43,6 +43,14 @@ class HashDescriptor:
         return buff
 
 
+class HashDescriptorDummy(HashDescriptor):
+    def __init__(self, fileno, digestsize):
+        pass
+
+    def digest(self, fileno, size):
+        return b''
+
+
 class Hash:
     AF_ALG = 38
     SOL_ALG = 279
@@ -98,6 +106,18 @@ class Hash:
         return d
 
 
+class HashDummy(Hash):
+    ALG_NAME = b'dummy'
+    ALG_BYTE = 0
+
+    def __init__(self):
+        pass
+
+    @contextlib.contextmanager
+    def open(self):
+        yield HashDescriptorDummy(0, 0)
+
+
 class HashCRC32C(Hash):
     ALG_NAME = b'crc32c'
     ALG_BYTE = 4
@@ -137,7 +157,7 @@ class HashSHA256(Hash):
 def main():
     digs = sorted(Hash.algorithm().keys())
     argp = argparse.ArgumentParser()
-    argp.add_argument('-a', '--algorithm', choices=digs, default='crc32c')
+    argp.add_argument('-a', '--algorithm', choices=digs, default='dummy')
     argp.add_argument('files', nargs=argparse.REMAINDER)
     args = argp.parse_args()
 
