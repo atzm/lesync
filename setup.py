@@ -12,7 +12,7 @@ setup(
     author_email='atzm@atzm.org',
     license='BSD-2',
     entry_points={'console_scripts': ['lesync = lesync:main']},
-    py_modules=['lesync'],
+    py_modules=['lesync', 'lehash'],
     install_requires=[],
     classifiers=[
         'Development Status :: 3 - Alpha',
