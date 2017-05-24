@@ -246,12 +246,12 @@ def prepare(args):
 
 
 def main():
-    digs = lehash.Hash.algorithm()
+    digs = sorted(lehash.Hash.algorithm().keys())
     argp = argparse.ArgumentParser()
     argp.add_argument('-v', '--verbose', action='count', default=0)
     argp.add_argument('-n', '--dry-run', action='store_true', default=False)
     argp.add_argument('-S', '--sync', action='store_true', default=False)
-    argp.add_argument('-D', '--digest', choices=digs.keys(), default='md5')
+    argp.add_argument('-D', '--digest', choices=digs, default='md5')
     argp.add_argument('-I', '--include', nargs='+', default=['*/', '*'])
     argp.add_argument('-X', '--exclude', nargs='+', default=[])
     argp.add_argument('-s', '--src-enc', default=sys.getfilesystemencoding())
