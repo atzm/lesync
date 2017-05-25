@@ -212,10 +212,9 @@ def walk(args, src, dst):
     if not src.isdir:
         return copy(args, src, dst)
 
-    with src.open():
-        with dst.mkdir(src):
-            for s in src.iterdir():
-                walk(args, s, dst)
+    with src.open(), dst.mkdir(src):
+        for s in src.iterdir():
+            walk(args, s, dst)
 
 
 def run(args):
