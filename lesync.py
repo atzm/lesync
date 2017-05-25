@@ -35,12 +35,13 @@ class File(metaclass=abc.ABCMeta):
         self.encoding = encoding
         self.hasher = hasher
         self.fileno = -1
-        self.statcache = self.stat0
+        self.statc = self.stat0
 
     def __eq__(self, other):
         if self.stat.st_size == other.stat.st_size:
-            if self.basename == other.basename:
-                return self.digest == other.digest
+            if self.stat.st_mtime == other.stat.st_mtime:
+                if self.basename == other.basename:
+                    return self.digest == other.digest
         return False
 
     def __ne__(self, other):
@@ -69,9 +70,9 @@ class File(metaclass=abc.ABCMeta):
 
     @property
     def stat(self):
-        if self.opened and self.statcache == self.stat0:
-            self.statcache = os.fstat(self.fileno)
-        return self.statcache
+        if self.opened and self.statc == self.stat0:
+            self.statc = os.stat_result(int(s) for s in os.fstat(self.fileno))
+        return self.statc
 
     @property
     def stat0(self):
@@ -96,17 +97,24 @@ class File(metaclass=abc.ABCMeta):
     @contextlib.contextmanager
     def open(self, mode=0o0644):
         try:
-            self.fileno = os.open(self.encoded, self.openflag, mode)
-            fcntl.flock(self.fileno, self.lockmode | fcntl.LOCK_NB)
+            try:
+                self.fileno = os.open(self.encoded, self.openflag, mode)
+                fcntl.flock(self.fileno, self.lockmode | fcntl.LOCK_NB)
+
+            except OSError as e:
+                if e.errno not in self.errnoignore:
+                    raise
+
             yield self
-        except OSError as e:
-            if e.errno not in self.errnoignore:
-                raise
-            yield self
+
         finally:
             if self.opened:
                 os.close(self.fileno)
                 self.fileno = -1
+
+    @contextlib.contextmanager
+    def mkdir(self, src):
+        yield
 
     def seek(self, *args, **kwargs):
         if self.opened:
@@ -115,10 +123,7 @@ class File(metaclass=abc.ABCMeta):
     def truncate(self, *args, **kwargs):
         pass
 
-    def copy(self, dst):
-        pass
-
-    def mkdir(self, mode=0o0755):
+    def copy(self, src):
         pass
 
 
@@ -131,13 +136,6 @@ class FileRD(File):
     def lockmode(self):
         return fcntl.LOCK_SH
 
-    def copy(self, dst):
-        if not (self.opened and dst.opened):
-            return
-        if not isinstance(dst, FileRDWR):
-            return
-        os.sendfile(dst.fileno, self.fileno, None, self.stat.st_size)
-
 
 class FileRDWR(File):
     @property
@@ -148,16 +146,25 @@ class FileRDWR(File):
     def lockmode(self):
         return fcntl.LOCK_EX
 
+    @contextlib.contextmanager
+    def mkdir(self, src):
+        try:
+            os.mkdir(self.encoded, src.stat.st_mode & 0o0777)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+        yield
+        os.utime(self.encoded, (src.stat.st_atime, src.stat.st_mtime))
+
     def truncate(self, *args, **kwargs):
         if self.opened:
             os.ftruncate(self.fileno, *args, **kwargs)
 
-    def mkdir(self, mode=0o0755):
-        try:
-            os.mkdir(self.encoded, mode)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+    def copy(self, src):
+        if not (self.opened and src.opened):
+            return
+        os.sendfile(self.fileno, src.fileno, None, src.stat.st_size)
+        os.utime(self.fileno, (src.stat.st_atime, src.stat.st_mtime))
 
 
 class FileStat(FileRD):
@@ -184,7 +191,7 @@ def copy(args, src, dst):
 
         dst.seek(0, os.SEEK_SET)
         dst.truncate(0)
-        src.copy(dst)
+        dst.copy(src)
 
         logging.info('copied: %s', src)
 
@@ -206,10 +213,9 @@ def walk(args, src, dst):
         return copy(args, src, dst)
 
     with src.open():
-        dst.mkdir(src.stat.st_mode & 0o0777)
-
-        for s in src.iterdir():
-            walk(args, s, dst)
+        with dst.mkdir(src):
+            for s in src.iterdir():
+                walk(args, s, dst)
 
 
 def run(args):
