@@ -100,7 +100,15 @@ class HashDescriptorDummy(HashDescriptor):
 class Hash:
     AF_ALG = 38
     SOL_ALG = 279
+
     ALG_SET_KEY = 1
+    ALG_SET_IV = 2
+    ALG_SET_OP = 3
+    ALG_SET_AEAD_ASSOCLEN = 4
+    ALG_SET_AEAD_AUTHSIZE = 5
+
+    ALG_OP_DECRYPT = 0
+    ALG_OP_ENCRYPT = 1
 
     ALG_TYPE = b'hash'
     ALG_NAME = None
