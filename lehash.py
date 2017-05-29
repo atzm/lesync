@@ -35,20 +35,19 @@ class HashDescriptor:
         self.fileno = fileno
         self.digestsize = digestsize
 
-    @staticmethod
-    @contextlib.contextmanager
-    def pipe():
-        try:
-            rfd, wfd = -1, -1
-            rfd, wfd = os.pipe()
-            yield rfd, wfd
-        finally:
-            if rfd >= 0:
-                os.close(rfd)
-            if wfd >= 0:
-                os.close(wfd)
-
     def splice(self, fileno, size):
+        @contextlib.contextmanager
+        def _pipe():
+            try:
+                rfd, wfd = -1, -1
+                rfd, wfd = os.pipe()
+                yield rfd, wfd
+            finally:
+                if rfd >= 0:
+                    os.close(rfd)
+                if wfd >= 0:
+                    os.close(wfd)
+
         def _splice(fd_in, off_in, fd_out, off_out, len_, flags):
             size = _libc.splice(fd_in, off_in, fd_out, off_out, len_, flags)
             if size < 0:
@@ -56,7 +55,7 @@ class HashDescriptor:
                 raise OSError(n, os.strerror(n))
             return size
 
-        with self.pipe() as (rfd, wfd):
+        with _pipe() as (rfd, wfd):
             while size > 0:
                 if size <= self.SPLICE_S_MAX:
                     mvlen = size
@@ -79,13 +78,15 @@ class HashDescriptor:
         else:
             os.write(self.fileno, b'')
 
-        buff = b''
+        buff = []
         size = 0
+
         while size < self.digestsize:
-            b = os.read(self.fileno, self.digestsize - size)
-            size += len(b)
-            buff += b
-        return buff
+            byte = os.read(self.fileno, self.digestsize - size)
+            size += len(byte)
+            buff.append(byte)
+
+        return b''.join(buff)
 
 
 class HashDescriptorDummy(HashDescriptor):
@@ -205,6 +206,7 @@ def main():
     argp.add_argument('-a', '--algorithm', choices=digs, default='dummy')
     argp.add_argument('-t', '--threads', type=int, default=os.cpu_count())
     argp.add_argument('files', nargs=argparse.REMAINDER)
+
     args = argp.parse_args()
     hasher = Hash.instance(args.algorithm)
 
