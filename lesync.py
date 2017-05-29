@@ -166,10 +166,8 @@ class FileRDWR(File):
             return
 
         size = src.stat.st_size
-        sent = 0
-
-        while sent < size:
-            sent += os.sendfile(self.fileno, src.fileno, None, size - sent)
+        while size > 0:
+            size -= os.sendfile(self.fileno, src.fileno, None, size)
 
         os.utime(self.fileno, (src.stat.st_atime, src.stat.st_mtime))
 
@@ -200,7 +198,7 @@ def copy(args, src, dst):
         dst.truncate(0)
         dst.copy(src)
 
-        logging.info('copied: %s', src)
+    logging.info('copied: %s', src)
 
 
 def xfnmatch(path, patterns):
