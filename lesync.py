@@ -15,6 +15,7 @@ import fnmatch
 import logging
 import argparse
 import contextlib
+from concurrent import futures
 
 import lehash
 
@@ -210,7 +211,7 @@ def walk(args, src, dst):
         dst = dst.join(src.basename)
 
     if not src.isdir:
-        return copy(args, src, dst)
+        return args.executor.submit(copy, args, src, dst)
 
     with src.open(), dst.mkdir(src):
         for s in src.iterdir():
@@ -239,6 +240,7 @@ def prepare(args):
     args.reader = FileRD
     args.writer = FileStat if args.dry_run else FileRDWR
     args.hasher = lehash.Hash.instance(args.digest)
+    args.executor = futures.ThreadPoolExecutor(max_workers=args.threads)
 
     if args.verbose > 1:
         loglevel = logging.DEBUG
@@ -255,6 +257,7 @@ def main():
     argp = argparse.ArgumentParser()
     argp.add_argument('-v', '--verbose', action='count', default=0)
     argp.add_argument('-n', '--dry-run', action='store_true', default=False)
+    argp.add_argument('-t', '--threads', type=int, default=1)
     argp.add_argument('-S', '--sync', action='store_true', default=False)
     argp.add_argument('-D', '--digest', choices=digs, default='dummy')
     argp.add_argument('-I', '--include', nargs='+', default=['*/', '*'])
@@ -266,7 +269,7 @@ def main():
     args = argp.parse_args()
     prepare(args)
 
-    with umask(0):
+    with umask(0), args.executor:
         run(args)
 
 
