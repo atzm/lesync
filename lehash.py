@@ -30,8 +30,11 @@ class HashDescriptor:
         self.digestsize = digestsize
 
     def digest(self, fileno, size):
-        os.sendfile(self.fileno, fileno, None, size)
-        os.lseek(fileno, 0, os.SEEK_SET)
+        if size:
+            os.sendfile(self.fileno, fileno, None, size)
+            os.lseek(fileno, 0, os.SEEK_SET)
+        else:
+            os.write(self.fileno, b'')
 
         buff = b''
         size = 0
