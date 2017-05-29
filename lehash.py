@@ -25,18 +25,70 @@ class _sockaddr_alg(ctypes.Structure):
 
 
 class HashDescriptor:
+    SPLICE_F_MOVE = 1
+    SPLICE_F_NONBLOCK = 2
+    SPLICE_F_MORE = 4
+    SPLICE_F_GIFT = 8
+    SPLICE_S_MAX = 4096 * 16
+
     def __init__(self, fileno, digestsize):
         self.fileno = fileno
         self.digestsize = digestsize
 
+    @staticmethod
+    @contextlib.contextmanager
+    def pipe():
+        try:
+            rfd, wfd = -1, -1
+            rfd, wfd = os.pipe()
+            yield rfd, wfd
+        finally:
+            if rfd >= 0:
+                os.close(rfd)
+            if wfd >= 0:
+                os.close(wfd)
+
+    @classmethod
+    def splice(cls, sfd, dfd, size):
+        with cls.pipe() as (rfd, wfd):
+            while size > 0:
+                if size <= cls.SPLICE_S_MAX:
+                    splen = size
+                    flags = cls.SPLICE_F_MOVE
+                else:
+                    splen = cls.SPLICE_S_MAX
+                    flags = cls.SPLICE_F_MOVE | cls.SPLICE_F_MORE
+
+                nr = _libc.splice(sfd, None, wfd, None, splen, flags)
+                if nr < 0:
+                    n = ctypes.get_errno()
+                    raise OSError(n, os.strerror(n))
+
+                nw = 0
+                while nw < nr:
+                    n = _libc.splice(rfd, None, dfd, None, nr - nw, flags)
+                    if n < 0:
+                        n = ctypes.get_errno()
+                        raise OSError(n, os.strerror(n))
+                    nw += n
+
+                assert nr == nw
+                size -= nr
+
     def digest(self, fileno, size):
         if size:
-            os.sendfile(self.fileno, fileno, None, size)
-            os.lseek(fileno, -size, os.SEEK_CUR)
+            self.splice(fileno, self.fileno, size)
+            os.lseek(fileno, 0, os.SEEK_SET)
         else:
             os.write(self.fileno, b'')
 
-        return os.read(self.fileno, self.digestsize)
+        buff = b''
+        size = 0
+        while size < self.digestsize:
+            b = os.read(self.fileno, self.digestsize - size)
+            size += len(b)
+            buff += b
+        return buff
 
 
 class HashDescriptorDummy(HashDescriptor):
