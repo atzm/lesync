@@ -48,37 +48,34 @@ class HashDescriptor:
             if wfd >= 0:
                 os.close(wfd)
 
-    @classmethod
-    def splice(cls, sfd, dfd, size):
-        with cls.pipe() as (rfd, wfd):
+    def splice(self, fileno, size):
+        def _splice(fd_in, off_in, fd_out, off_out, len_, flags):
+            size = _libc.splice(fd_in, off_in, fd_out, off_out, len_, flags)
+            if size < 0:
+                n = ctypes.get_errno()
+                raise OSError(n, os.strerror(n))
+            return size
+
+        with self.pipe() as (rfd, wfd):
             while size > 0:
-                if size <= cls.SPLICE_S_MAX:
-                    splen = size
-                    flags = cls.SPLICE_F_MOVE
+                if size <= self.SPLICE_S_MAX:
+                    mvlen = size
+                    flags = self.SPLICE_F_MOVE
                 else:
-                    splen = cls.SPLICE_S_MAX
-                    flags = cls.SPLICE_F_MOVE | cls.SPLICE_F_MORE
+                    mvlen = self.SPLICE_S_MAX
+                    flags = self.SPLICE_F_MOVE | self.SPLICE_F_MORE
 
-                nr = _libc.splice(sfd, None, wfd, None, splen, flags)
-                if nr < 0:
-                    n = ctypes.get_errno()
-                    raise OSError(n, os.strerror(n))
-
-                nw = 0
-                while nw < nr:
-                    n = _libc.splice(rfd, None, dfd, None, nr - nw, flags)
-                    if n < 0:
-                        n = ctypes.get_errno()
-                        raise OSError(n, os.strerror(n))
-                    nw += n
-
+                nr = _splice(fileno, None, wfd, None, mvlen, flags)
+                nw = _splice(rfd, None, self.fileno, None, mvlen, flags)
                 assert nr == nw
+
                 size -= nr
+
+        os.lseek(fileno, 0, os.SEEK_SET)
 
     def digest(self, fileno, size):
         if size:
-            self.splice(fileno, self.fileno, size)
-            os.lseek(fileno, 0, os.SEEK_SET)
+            self.splice(fileno, size)
         else:
             os.write(self.fileno, b'')
 
