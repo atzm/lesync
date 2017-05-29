@@ -32,19 +32,11 @@ class HashDescriptor:
     def digest(self, fileno, size):
         if size:
             os.sendfile(self.fileno, fileno, None, size)
-            os.lseek(fileno, 0, os.SEEK_SET)
+            os.lseek(fileno, -size, os.SEEK_CUR)
         else:
             os.write(self.fileno, b'')
 
-        buff = b''
-        size = 0
-
-        while size < self.digestsize:
-            b = os.read(self.fileno, self.digestsize - size)
-            size += len(b)
-            buff += b
-
-        return buff
+        return os.read(self.fileno, self.digestsize)
 
 
 class HashDescriptorDummy(HashDescriptor):
