@@ -9,6 +9,7 @@ import socket
 import ctypes
 import argparse
 import contextlib
+from concurrent import futures
 
 _libc = ctypes.CDLL('libc.so.6', use_errno=True)
 
@@ -158,16 +159,24 @@ def main():
     digs = sorted(Hash.algorithm().keys())
     argp = argparse.ArgumentParser()
     argp.add_argument('-a', '--algorithm', choices=digs, default='dummy')
+    argp.add_argument('-t', '--threads', type=int, default=os.cpu_count())
     argp.add_argument('files', nargs=argparse.REMAINDER)
     args = argp.parse_args()
+    hasher = Hash.instance(args.algorithm)
 
-    with Hash.instance(args.algorithm).open() as desc:
-        for path in args.files:
-            with open(path) as fp:
-                fileno = fp.fileno()
-                fcntl.flock(fileno, fcntl.LOCK_SH)
-                digest = desc.digest(fileno, os.fstat(fileno).st_size)
-                print(codecs.encode(digest, 'hex').decode(), '', path)
+    def run(path):
+        with hasher.open() as desc, open(path) as fp:
+            fileno = fp.fileno()
+            fcntl.flock(fileno, fcntl.LOCK_SH)
+            return desc.digest(fileno, os.fstat(fileno).st_size)
+
+    with futures.ThreadPoolExecutor(max_workers=args.threads) as executor:
+        futuredict = {executor.submit(run, path): path for path in args.files}
+
+        for future in futures.as_completed(futuredict):
+            path = futuredict[future]
+            digest = future.result()
+            print(codecs.encode(digest, 'hex').decode(), '', path)
 
 
 if __name__ == '__main__':
