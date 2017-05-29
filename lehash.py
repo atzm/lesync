@@ -90,7 +90,7 @@ class HashDescriptor:
 
 
 class HashDescriptorDummy(HashDescriptor):
-    def __init__(self, fileno, digestsize):
+    def splice(self, fileno, size):
         pass
 
     def digest(self, fileno, size):
