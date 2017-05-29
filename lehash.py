@@ -73,20 +73,18 @@ class HashDescriptor:
         os.lseek(fileno, 0, os.SEEK_SET)
 
     def digest(self, fileno, size):
+        def _read(fileno, size):
+            while size > 0:
+                byte = os.read(fileno, size)
+                size -= len(byte)
+                yield byte
+
         if size:
             self.splice(fileno, size)
         else:
             os.write(self.fileno, b'')
 
-        buff = []
-        size = 0
-
-        while size < self.digestsize:
-            byte = os.read(self.fileno, self.digestsize - size)
-            size += len(byte)
-            buff.append(byte)
-
-        return b''.join(buff)
+        return b''.join(_read(self.fileno, self.digestsize))
 
 
 class HashDescriptorDummy(HashDescriptor):
