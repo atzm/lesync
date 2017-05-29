@@ -164,7 +164,13 @@ class FileRDWR(File):
     def copy(self, src):
         if not (self.opened and src.opened):
             return
-        os.sendfile(self.fileno, src.fileno, None, src.stat.st_size)
+
+        size = src.stat.st_size
+        sent = 0
+
+        while sent < size:
+            sent += os.sendfile(self.fileno, src.fileno, None, size - sent)
+
         os.utime(self.fileno, (src.stat.st_atime, src.stat.st_mtime))
 
 
