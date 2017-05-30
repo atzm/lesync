@@ -192,13 +192,13 @@ def umask(mask):
 def copy(args, src, dst):
     with src.open(), dst.open(src.stat.st_mode & 0o0777):
         if args.sync and src == dst:
-            return logging.debug('skipped: %s', src)
+            return logging.debug('skip: %s', src)
 
         dst.seek(0, os.SEEK_SET)
         dst.truncate(0)
         dst.copy(src)
 
-    logging.info('copied: %s', src)
+    logging.info('copy: %s', src)
 
 
 def xfnmatch(path, patterns):
@@ -209,7 +209,7 @@ def walk(args, src, dst):
     match = str(src) + os.sep if src.isdir else str(src)
 
     if not xfnmatch(match, args.include) or xfnmatch(match, args.exclude):
-        return logging.debug('skipped: %s', src)
+        return logging.debug('skip: %s', src)
 
     if dst.isdir:
         dst = dst.join(src.basename)
