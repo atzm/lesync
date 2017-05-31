@@ -29,7 +29,9 @@ class HashDescriptor:
     SPLICE_F_NONBLOCK = 2
     SPLICE_F_MORE = 4
     SPLICE_F_GIFT = 8
-    SPLICE_S_MAX = 4096 * 16
+
+    # max page size is 16 in the kernel (<4.11)
+    SPLICE_S_MAX = os.sysconf(os.sysconf_names['SC_PAGESIZE']) * 16
 
     def __init__(self, fileno, digestsize):
         self.fileno = fileno
