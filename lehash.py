@@ -208,6 +208,11 @@ class HashSHA256(Hash):
     ALG_BYTE = 32
 
 
+class HashSHA512(Hash):
+    ALG_NAME = b'sha512'
+    ALG_BYTE = 64
+
+
 def main():
     digs = sorted(Hash.algorithm().keys())
     argp = argparse.ArgumentParser()
