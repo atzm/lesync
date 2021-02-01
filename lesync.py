@@ -39,11 +39,13 @@ class File(metaclass=abc.ABCMeta):
         self.statc = self.stat0
 
     def __eq__(self, other):
-        if self.stat.st_size == other.stat.st_size:
-            if self.stat.st_mtime == other.stat.st_mtime:
-                if self.basename == other.basename:
-                    return self.digest == other.digest
-        return False
+        for attr in ['st_size', 'st_mtime']:
+            if getattr(self.stat, attr) != getattr(other.stat, attr):
+                return False
+        for attr in ['basename', 'digest']:
+            if getattr(self, attr) != getattr(other, attr):
+                return False
+        return True
 
     def __ne__(self, other):
         return not self.__eq__(other)
