@@ -1,4 +1,8 @@
 # lesync
-lesync is a simple program to copy files and directory trees with converting
-filename encoding like 'rsync --iconv' but its logic is simplified for some
-filesystems, e.g. exFAT on fuse.
+lesync is a simple program to copy/synchronize files and directory trees
+without copying buffers to userspace using `sendfile(2)`.
+
+# lehash
+lehash is a simple program to digest files using the Linux Kernel Crypto API.
+The digest is done without copying buffers to userspace using `pipe(2)` and
+`splice(2)` too.
