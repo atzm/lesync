@@ -245,7 +245,7 @@ def run(args):
 def prepare(args):
     args.reader = FileRD
     args.writer = FileStat if args.dry_run else FileRDWR
-    args.hasher = lehash.Hash.instance(args.digest)
+    args.hasher = lehash.Hash.instance(args.digest, args.digest_key)
     args.executor = futures.ThreadPoolExecutor(max_workers=args.threads)
 
     if args.verbose > 1:
@@ -266,6 +266,7 @@ def main():
     argp.add_argument('-t', '--threads', type=int, default=1)
     argp.add_argument('-S', '--sync', action='store_true', default=False)
     argp.add_argument('-D', '--digest', choices=digs, default='dummy')
+    argp.add_argument('-k', '--digest-key')
     argp.add_argument('-I', '--include', nargs='+', default=['*/', '*'])
     argp.add_argument('-X', '--exclude', nargs='+', default=[])
     argp.add_argument('-s', '--src-enc', default=sys.getfilesystemencoding())

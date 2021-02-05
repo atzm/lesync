@@ -4,6 +4,7 @@
 
 import os
 import fcntl
+import string
 import codecs
 import socket
 import ctypes
@@ -89,14 +90,6 @@ class HashDescriptor:
         return b''.join(_read(self.fileno, self.digestsize))
 
 
-class HashDescriptorDummy(HashDescriptor):
-    def splice(self, fileno, size):
-        pass
-
-    def digest(self, fileno, size):
-        return b''
-
-
 class Hash:
     AF_ALG = 38
     SOL_ALG = 279
@@ -114,7 +107,7 @@ class Hash:
     ALG_NAME = None
     ALG_BYTE = None
 
-    def __init__(self):
+    def __init__(self, key):
         sock = socket.socket(self.AF_ALG, socket.SOCK_SEQPACKET, 0)
         algo = _sockaddr_alg(self.AF_ALG, self.ALG_TYPE, 0, 0, self.ALG_NAME)
 
@@ -124,6 +117,7 @@ class Hash:
             sock.close()
             raise OSError(n, os.strerror(n))
 
+        self.key = key
         self.sock = self.prepare(sock)
         self.algo = algo
 
@@ -131,8 +125,15 @@ class Hash:
         if getattr(self, 'sock', None):
             self.sock.close()
 
-    @classmethod
-    def prepare(cls, sock):
+    def prepare(self, sock):
+        if self.key is not None:
+            r = _libc.setsockopt(sock.fileno(), self.SOL_ALG, self.ALG_SET_KEY,
+                                 self.key.encode(), self.ALG_BYTE)
+            if r < 0:
+                n = ctypes.get_errno()
+                sock.close()
+                raise OSError(n, os.strerror(n))
+
         return sock
 
     @contextlib.contextmanager
@@ -148,80 +149,80 @@ class Hash:
                 os.close(fileno)
 
     @classmethod
-    def instance(cls, name):
-        return cls.algorithm()[name]()
+    def instance(cls, name, key=None):
+        return cls.algorithm()[name](key)
 
     @classmethod
     def algorithm(cls):
         d = {}
         for c in cls.__subclasses__():
             d.update(c.algorithm())
-            d[c.ALG_NAME.decode()] = c
+            d[c.__name__] = c
         return d
 
 
-class HashDummy(Hash):
+class dummy(Hash):
     ALG_NAME = b'dummy'
     ALG_BYTE = 0
 
-    def __init__(self):
+    class descriptor(HashDescriptor):
+        def splice(self, fileno, size):
+            pass
+
+        def digest(self, fileno, size):
+            return b''
+
+    def __init__(self, key):
         pass
 
     @contextlib.contextmanager
     def open(self):
-        yield HashDescriptorDummy(0, 0)
+        yield self.descriptor(0, 0)
 
 
-class HashCRC32C(Hash):
-    ALG_NAME = b'crc32c'
-    ALG_BYTE = 4
+def iteralgo():
+    with open('/proc/crypto') as fp:
+        algo = {}
 
-    @classmethod
-    def prepare(cls, sock):
-        r = _libc.setsockopt(sock.fileno(), cls.SOL_ALG, cls.ALG_SET_KEY,
-                             b'\xff' * cls.ALG_BYTE, cls.ALG_BYTE)
-        if r < 0:
-            n = ctypes.get_errno()
-            sock.close()
-            raise OSError(n, os.strerror(n))
+        for line in fp:
+            line = line.strip()
 
-        return sock
+            if not line:
+                if algo.get('type') == 'shash':
+                    yield algo
 
+                algo = {}
+                continue
 
-class HashMD5(Hash):
-    ALG_NAME = b'md5'
-    ALG_BYTE = 16
+            key, val = line.split(':', 1)
+            algo[key.strip()] = val.strip()
 
 
-class HashSHA1(Hash):
-    ALG_NAME = b'sha1'
-    ALG_BYTE = 20
+def defalgo():
+    table = str.maketrans(string.punctuation, '_' * len(string.punctuation))
 
+    for algo in iteralgo():
+        name = algo['driver'].translate(table).strip('_')
 
-class HashSHA224(Hash):
-    ALG_NAME = b'sha224'
-    ALG_BYTE = 28
+        if name.endswith('_generic'):
+            name = name[:-8]
 
-
-class HashSHA256(Hash):
-    ALG_NAME = b'sha256'
-    ALG_BYTE = 32
-
-
-class HashSHA512(Hash):
-    ALG_NAME = b'sha512'
-    ALG_BYTE = 64
+        globals()[name] = type(name, (Hash,), {
+            'ALG_NAME': algo['driver'].encode(),
+            'ALG_BYTE': int(algo['digestsize']),
+        })
 
 
 def main():
     digs = sorted(Hash.algorithm().keys())
     argp = argparse.ArgumentParser()
     argp.add_argument('-a', '--algorithm', choices=digs, default='dummy')
+    argp.add_argument('-k', '--key')
     argp.add_argument('-t', '--threads', type=int, default=os.cpu_count())
     argp.add_argument('files', nargs=argparse.REMAINDER)
 
     args = argp.parse_args()
-    hasher = Hash.instance(args.algorithm)
+    hasher = Hash.instance(args.algorithm, args.key)
 
     def run(path):
         with hasher.open() as desc, open(path) as fp:
@@ -237,6 +238,8 @@ def main():
             digest = future.result()
             print(codecs.encode(digest, 'hex').decode(), '', path)
 
+
+defalgo()
 
 if __name__ == '__main__':
     main()
