@@ -222,7 +222,7 @@ def main():
     argp.add_argument('files', nargs=argparse.REMAINDER)
 
     args = argp.parse_args()
-    hasher = Hash.instance(args.algorithm, args.key)
+    hasher = Hash.instance(args.digest_algo, args.digest_key)
 
     def run(path):
         with hasher.open() as desc, open(path) as fp:

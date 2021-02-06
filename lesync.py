@@ -240,7 +240,7 @@ def run(args):
 def prepare(args):
     args.reader = FileRD
     args.writer = FileStat if args.dry_run else FileRDWR
-    args.hasher = lehash.Hash.instance(args.digest, args.digest_key)
+    args.hasher = lehash.Hash.instance(args.digest_algo, args.digest_key)
     args.executor = futures.ThreadPoolExecutor(max_workers=args.threads)
 
     if args.verbose > 1:
