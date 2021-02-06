@@ -264,7 +264,7 @@ def main():
     argp.add_argument('-s', '--src-enc', default=sys.getfilesystemencoding())
     argp.add_argument('-d', '--dst-enc', default='utf-8')
     argp.add_argument('-a', '--digest-algo', choices=digs, default='dummy')
-    argp.add_argument('-k', '--digest-key')
+    argp.add_argument('-k', '--digest-key', type=os.fsencode)
     argp.add_argument('-t', '--threads', type=int, default=os.cpu_count())
     argp.add_argument('files', nargs=argparse.REMAINDER)
 

@@ -128,7 +128,7 @@ class Hash:
     def prepare(self, sock):
         if self.key is not None:
             r = _libc.setsockopt(sock.fileno(), self.SOL_ALG, self.ALG_SET_KEY,
-                                 self.key.encode(), self.ALG_BYTE)
+                                 self.key, self.ALG_BYTE)
             if r < 0:
                 n = ctypes.get_errno()
                 sock.close()
@@ -217,7 +217,7 @@ def main():
     digs = sorted(Hash.algorithm().keys())
     argp = argparse.ArgumentParser()
     argp.add_argument('-a', '--digest-algo', choices=digs, default='dummy')
-    argp.add_argument('-k', '--digest-key')
+    argp.add_argument('-k', '--digest-key', type=os.fsencode)
     argp.add_argument('-t', '--threads', type=int, default=os.cpu_count())
     argp.add_argument('files', nargs=argparse.REMAINDER)
 
