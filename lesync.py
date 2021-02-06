@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#
-# lesync -- a simple program to copy files and directory trees with converting
-#           filename encoding like 'rsync --iconv' but its logic is simplified
-#           for some filesystems, e.g. exFAT on fuse.
-#
 
 import os
 import sys
@@ -126,7 +121,7 @@ class File(metaclass=abc.ABCMeta):
     def truncate(self, *args, **kwargs):
         pass
 
-    def copy(self, src):
+    def copyfrom(self, src):
         pass
 
 
@@ -163,7 +158,7 @@ class FileRDWR(File):
         if self.opened:
             os.ftruncate(self.fileno, *args, **kwargs)
 
-    def copy(self, src):
+    def copyfrom(self, src):
         if not (self.opened and src.opened):
             return
 
@@ -198,9 +193,9 @@ def copy(args, src, dst):
 
         dst.seek(0, os.SEEK_SET)
         dst.truncate(0)
-        dst.copy(src)
+        dst.copyfrom(src)
 
-    logging.info('copy: %s', src)
+    logging.info('copy: %s -> %s', src, dst)
 
 
 def xfnmatch(path, patterns):
@@ -263,7 +258,7 @@ def main():
     argp = argparse.ArgumentParser()
     argp.add_argument('-v', '--verbose', action='count', default=0)
     argp.add_argument('-n', '--dry-run', action='store_true', default=False)
-    argp.add_argument('-t', '--threads', type=int, default=1)
+    argp.add_argument('-t', '--threads', type=int, default=os.cpu_count())
     argp.add_argument('-S', '--sync', action='store_true', default=False)
     argp.add_argument('-D', '--digest', choices=digs, default='dummy')
     argp.add_argument('-k', '--digest-key')
