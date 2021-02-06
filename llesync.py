@@ -12,7 +12,7 @@ import argparse
 import contextlib
 from concurrent import futures
 
-import lehash
+import llehash
 
 
 class File(metaclass=abc.ABCMeta):
@@ -240,7 +240,7 @@ def run(args):
 def prepare(args):
     args.reader = FileRD
     args.writer = FileStat if args.dry_run else FileRDWR
-    args.hasher = lehash.Hash.instance(args.digest_algo, args.digest_key)
+    args.hasher = llehash.Hash.instance(args.digest_algo, args.digest_key)
     args.executor = futures.ThreadPoolExecutor(max_workers=args.threads)
 
     if args.verbose > 1:
@@ -254,7 +254,7 @@ def prepare(args):
 
 
 def main():
-    digs = sorted(lehash.Hash.algorithm().keys())
+    digs = sorted(llehash.Hash.algorithm().keys())
     argp = argparse.ArgumentParser()
     argp.add_argument('-v', '--verbose', action='count', default=0)
     argp.add_argument('-n', '--dry-run', action='store_true', default=False)

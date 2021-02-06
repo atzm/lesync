@@ -4,7 +4,7 @@
 from setuptools import setup
 
 setup(
-    name='lesync',
+    name='llesync',
     version='0.1',
     description='simple programs to copy or digest files '
                 'without copying buffers to userspace',
@@ -12,10 +12,10 @@ setup(
     author_email='atzm@atzm.org',
     license='BSD-2',
     entry_points={'console_scripts': [
-        'lesync = lesync:main',
-        'lehash = lehash:main',
+        'llesync = llesync:main',
+        'llehash = llehash:main',
     ]},
-    py_modules=['lesync', 'lehash'],
+    py_modules=['llesync', 'llehash'],
     install_requires=[],
     classifiers=[
         'Development Status :: 3 - Alpha',
