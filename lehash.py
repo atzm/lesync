@@ -216,8 +216,8 @@ def defalgo():
 def main():
     digs = sorted(Hash.algorithm().keys())
     argp = argparse.ArgumentParser()
-    argp.add_argument('-a', '--algorithm', choices=digs, default='dummy')
-    argp.add_argument('-k', '--key')
+    argp.add_argument('-a', '--digest-algo', choices=digs, default='dummy')
+    argp.add_argument('-k', '--digest-key')
     argp.add_argument('-t', '--threads', type=int, default=os.cpu_count())
     argp.add_argument('files', nargs=argparse.REMAINDER)
 
