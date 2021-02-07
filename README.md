@@ -2,9 +2,11 @@
 llesync is a simple program to copy/synchronize files and directory trees
 without copying buffers to userspace using `sendfile(2)`.
 
-Here is a simple benchmark of llesync vs. rsync vs. cp on Intel Core i9-9900 @
-3.10GHz 16-cores:
+Here is a simple benchmark of llesync vs. rsync vs. cp:
 ```
+$ uname -srvmpio
+Linux 5.4.92-gentoo #4 SMP Wed Feb 3 15:40:26 JST 2021 x86_64 Intel(R) Core(TM) i9-9900 CPU @ 3.10GHz GenuineIntel GNU/Linux
+
 $ ls -l data1.dat data2.dat data3.dat
 -rw-r--r-- 1 user users 1555821443 Aug 20  2018 data1.dat
 -rw-r--r-- 1 user users 1979275517 Aug 20  2018 data2.dat
@@ -42,9 +44,11 @@ llehash is a simple program to digest files using the Linux Kernel Crypto API.
 The digest is done without copying buffers to userspace too, using `pipe(2)`
 and `splice(2)`.
 
-Here is a simple benchmark of kernel sha256-avx2 vs. userspace sha256sum on
-Intel Core i9-9900 @ 3.10GHz 16-cores:
+Here is a simple benchmark of kernel sha256-avx2 vs. userspace sha256sum:
 ```
+$ uname -srvmpio
+Linux 5.4.92-gentoo #4 SMP Wed Feb 3 15:40:26 JST 2021 x86_64 Intel(R) Core(TM) i9-9900 CPU @ 3.10GHz GenuineIntel GNU/Linux
+
 $ ls -l data1.dat data2.dat data3.dat
 -rw-r--r-- 1 user users 1555821443 Aug 20  2018 data1.dat
 -rw-r--r-- 1 user users 1979275517 Aug 20  2018 data2.dat
