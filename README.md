@@ -2,6 +2,41 @@
 llesync is a simple program to copy/synchronize files and directory trees
 without copying buffers to userspace using `sendfile(2)`.
 
+Here is a simple benchmark of llesync vs. rsync vs. cp on Intel Core i9-9900 @
+3.10GHz 16-cores:
+```
+$ ls -l data1.dat data2.dat data3.dat
+-rw-r--r-- 1 user users 1555821443 Aug 20  2018 data1.dat
+-rw-r--r-- 1 user users 1979275517 Aug 20  2018 data2.dat
+-rw-r--r-- 1 user users 2486493060 Aug 20  2018 data3.dat
+
+$ rm dst/*
+$ sudo bash -c 'echo 1 > /proc/sys/vm/drop_caches'
+$ time llesync -S data1.dat data2.dat data3.dat dst/.
+
+real    0m3.955s
+user    0m0.050s
+sys     0m3.012s
+
+$ rm dst/*
+$ sudo bash -c 'echo 1 > /proc/sys/vm/drop_caches'
+$ time rsync -a data1.dat data2.dat data3.dat dst/.
+
+real    0m12.249s
+user    0m13.692s
+sys     0m4.070s
+
+$ rm dst/*
+$ sudo bash -c 'echo 1 > /proc/sys/vm/drop_caches'
+$ time cp -a data1.dat data2.dat data3.dat dst/.
+
+real    0m2.385s
+user    0m0.011s
+sys     0m2.340s
+```
+
+Note: of course llesync and rsync skips same files but cp does not.
+
 # llehash
 llehash is a simple program to digest files using the Linux Kernel Crypto API.
 The digest is done without copying buffers to userspace too, using `pipe(2)`
