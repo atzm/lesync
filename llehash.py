@@ -67,7 +67,7 @@ class HashDescriptor:
             raise OSError(n, os.strerror(n))
         return size
 
-    def splice(self, fileno):
+    def digest(self, fileno):
         with self._pipe() as (rfd, wfd):
             mvlen = self.SPLICE_S_MAX
             flags = self.SPLICE_F_MOVE | self.SPLICE_F_MORE
@@ -86,8 +86,6 @@ class HashDescriptor:
             if e.errno != errno.ESPIPE:
                 raise
 
-    def digest(self, fileno):
-        self.splice(fileno)
         return b''.join(self._read(self.fileno, self.digestsize))
 
 
