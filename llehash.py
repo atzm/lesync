@@ -180,7 +180,7 @@ class dummy(Hash):
         yield self.descriptor(0, 0)
 
 
-def iteralgo():
+def iteralgo(filter_=lambda x: True):
     with open('/proc/crypto') as fp:
         algo = {}
 
@@ -188,7 +188,7 @@ def iteralgo():
             line = line.strip()
 
             if not line:
-                if algo.get('type') == 'shash':
+                if filter_(algo):
                     yield algo
 
                 algo = {}
@@ -201,7 +201,7 @@ def iteralgo():
 def defalgo():
     table = str.maketrans(string.punctuation, '_' * len(string.punctuation))
 
-    for algo in iteralgo():
+    for algo in iteralgo(lambda x: x.get('type') == 'shash'):
         name = algo['driver'].translate(table).strip('_')
 
         if name.endswith('_generic'):
