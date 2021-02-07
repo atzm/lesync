@@ -165,9 +165,6 @@ class dummy(Hash):
     ALG_BYTE = 0
 
     class descriptor(HashDescriptor):
-        def splice(self, fileno, size):
-            pass
-
         def digest(self, fileno):
             return b''
 
