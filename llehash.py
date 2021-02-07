@@ -3,6 +3,7 @@
 # for python 3.5 or earlier
 
 import os
+import errno
 import fcntl
 import string
 import codecs
@@ -38,56 +39,56 @@ class HashDescriptor:
         self.fileno = fileno
         self.digestsize = digestsize
 
-    def splice(self, fileno, size):
-        @contextlib.contextmanager
-        def _pipe():
-            try:
-                rfd, wfd = -1, -1
-                rfd, wfd = os.pipe()
-                yield rfd, wfd
-            finally:
-                if rfd >= 0:
-                    os.close(rfd)
-                if wfd >= 0:
-                    os.close(wfd)
+    @staticmethod
+    def _read(fileno, size):
+        while size > 0:
+            byte = os.read(fileno, size)
+            size -= len(byte)
+            yield byte
 
-        def _splice(fd_in, off_in, fd_out, off_out, len_, flags):
-            size = _libc.splice(fd_in, off_in, fd_out, off_out, len_, flags)
-            if size < 0:
-                n = ctypes.get_errno()
-                raise OSError(n, os.strerror(n))
-            return size
+    @staticmethod
+    @contextlib.contextmanager
+    def _pipe():
+        try:
+            rfd, wfd = -1, -1
+            rfd, wfd = os.pipe()
+            yield rfd, wfd
+        finally:
+            if rfd >= 0:
+                os.close(rfd)
+            if wfd >= 0:
+                os.close(wfd)
 
-        with _pipe() as (rfd, wfd):
-            while size > 0:
-                if size <= self.SPLICE_S_MAX:
-                    mvlen = size
-                    flags = self.SPLICE_F_MOVE
-                else:
-                    mvlen = self.SPLICE_S_MAX
-                    flags = self.SPLICE_F_MOVE | self.SPLICE_F_MORE
+    @staticmethod
+    def _splice(fd_in, off_in, fd_out, off_out, len_, flags):
+        size = _libc.splice(fd_in, off_in, fd_out, off_out, len_, flags)
+        if size < 0:
+            n = ctypes.get_errno()
+            raise OSError(n, os.strerror(n))
+        return size
 
-                nr = _splice(fileno, None, wfd, None, mvlen, flags)
-                nw = _splice(rfd, None, self.fileno, None, mvlen, flags)
+    def splice(self, fileno):
+        with self._pipe() as (rfd, wfd):
+            mvlen = self.SPLICE_S_MAX
+            flags = self.SPLICE_F_MOVE | self.SPLICE_F_MORE
+
+            while True:
+                nr = self._splice(fileno, None, wfd, None, mvlen, flags)
+                if nr == 0:
+                    break
+
+                nw = self._splice(rfd, None, self.fileno, None, mvlen, flags)
                 assert nr == nw
 
-                size -= nr
+        try:
+            os.lseek(fileno, 0, os.SEEK_SET)
+        except OSError as e:
+            if e.errno != errno.ESPIPE:
+                raise
 
-        os.lseek(fileno, 0, os.SEEK_SET)
-
-    def digest(self, fileno, size):
-        def _read(fileno, size):
-            while size > 0:
-                byte = os.read(fileno, size)
-                size -= len(byte)
-                yield byte
-
-        if size:
-            self.splice(fileno, size)
-        else:
-            os.write(self.fileno, b'')
-
-        return b''.join(_read(self.fileno, self.digestsize))
+    def digest(self, fileno):
+        self.splice(fileno)
+        return b''.join(self._read(self.fileno, self.digestsize))
 
 
 class Hash:
@@ -169,7 +170,7 @@ class dummy(Hash):
         def splice(self, fileno, size):
             pass
 
-        def digest(self, fileno, size):
+        def digest(self, fileno):
             return b''
 
     def __init__(self, key):
@@ -228,7 +229,7 @@ def main():
         with hasher.open() as desc, open(path) as fp:
             fileno = fp.fileno()
             fcntl.flock(fileno, fcntl.LOCK_SH)
-            return desc.digest(fileno, os.fstat(fileno).st_size)
+            return desc.digest(fileno)
 
     with futures.ThreadPoolExecutor(max_workers=args.threads) as executor:
         futuredict = {executor.submit(run, path): path for path in args.files}

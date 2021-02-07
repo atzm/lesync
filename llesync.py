@@ -60,7 +60,7 @@ class File(metaclass=abc.ABCMeta):
     def digest(self):
         if self.opened:
             with self.hasher.open() as desc:
-                return desc.digest(self.fileno, self.stat.st_size)
+                return desc.digest(self.fileno)
 
     @property
     def opened(self):
