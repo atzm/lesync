@@ -16,9 +16,9 @@ $ rm dst/*
 $ sudo bash -c 'echo 1 > /proc/sys/vm/drop_caches'
 $ time llesync -S data1.dat data2.dat data3.dat dst/.
 
-real    0m3.955s
-user    0m0.050s
-sys     0m3.012s
+real    0m4.023s
+user    0m0.040s
+sys     0m3.030s
 
 $ rm dst/*
 $ sudo bash -c 'echo 1 > /proc/sys/vm/drop_caches'
