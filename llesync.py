@@ -189,7 +189,8 @@ def umask(mask):
 def copy(args, src, dst):
     with src.open(), dst.open(src.stat.st_mode & 0o0777):
         if args.sync and src == dst:
-            return logging.debug('skip: %s', src)
+            logging.debug('skip: %s', src)
+            return
 
         dst.seek(0, os.SEEK_SET)
         dst.truncate(0)
@@ -206,35 +207,48 @@ def walk(args, src, dst):
     match = str(src) + os.sep if src.isdir else str(src)
 
     if not xfnmatch(match, args.include) or xfnmatch(match, args.exclude):
-        return logging.debug('skip: %s', src)
+        logging.debug('skip: %s', src)
+        return
 
     if dst.isdir:
         dst = dst.join(src.basename)
 
     if not src.isdir:
-        return args.executor.submit(copy, args, src, dst)
+        yield args.executor.submit(copy, args, src, dst)
+        return
 
     with src.open(), dst.mkdir(src):
-        for s in src.iterdir():
-            walk(args, s, dst)
+        for xsrc in src.iterdir():
+            for future in walk(args, xsrc, dst):
+                yield future
 
 
 def run(args):
     nfiles = len(args.files)
 
     if nfiles < 2:
-        return logging.error('two files required at least')
+        logging.error('two files required at least')
+        return
+
+    if nfiles == 2:
+        src = args.reader(args.files[0], args.src_enc, args.hasher)
+        dst = args.reader(args.files[1], args.dst_enc, args.hasher)
+        if src.isdir and not dst.isdir:
+            logging.error('last file must be a directory')
+            return
 
     if nfiles > 2:
         dst = args.reader(args.files[-1], args.dst_enc, args.hasher)
         if not dst.isdir:
-            return logging.error('last file must be a directory')
+            logging.error('last file must be a directory')
+            return
 
     dst = args.writer(args.files.pop(), args.dst_enc, args.hasher)
 
     while args.files:
         src = args.reader(args.files.pop(0), args.src_enc, args.hasher)
-        walk(args, src, dst)
+        for future in walk(args, src, dst):
+            yield future
 
 
 def prepare(args):
@@ -272,7 +286,11 @@ def main():
     prepare(args)
 
     with umask(0), args.executor:
-        run(args)
+        for future in futures.as_completed(run(args)):
+            try:
+                future.result()
+            except Exception as e:
+                logging.error(str(e))
 
 
 if __name__ == '__main__':
