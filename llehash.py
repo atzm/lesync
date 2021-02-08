@@ -10,6 +10,7 @@ import codecs
 import socket
 import ctypes
 import argparse
+import functools
 import contextlib
 from concurrent import futures
 
@@ -32,12 +33,24 @@ class HashDescriptor:
     SPLICE_F_MORE = 4
     SPLICE_F_GIFT = 8
 
-    # max page size is 16 in the kernel (<4.11)
-    SPLICE_S_MAX = os.sysconf(os.sysconf_names['SC_PAGESIZE']) * 16
+    F_SETPIPE_SZ = 1031
+    F_GETPIPE_SZ = 1032
 
     def __init__(self, fileno, digestsize):
         self.fileno = fileno
         self.digestsize = digestsize
+
+    @property
+    @functools.lru_cache(maxsize=None)
+    def pipe_max_size(self):
+        try:
+            with open('/proc/sys/fs/pipe-max-size') as fp:
+                return int(fp.read().strip())
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+        # default number of pages is 16 since kernel 2.6.11
+        return os.sysconf(os.sysconf_names['SC_PAGESIZE']) * 16
 
     @staticmethod
     def _read(fileno, size):
@@ -69,7 +82,7 @@ class HashDescriptor:
 
     def digest(self, fileno):
         with self._pipe() as (rfd, wfd):
-            mvlen = self.SPLICE_S_MAX
+            mvlen = fcntl.fcntl(wfd, self.F_SETPIPE_SZ, self.pipe_max_size)
             flags = self.SPLICE_F_MOVE | self.SPLICE_F_MORE
 
             while True:
