@@ -10,7 +10,6 @@ import codecs
 import socket
 import ctypes
 import argparse
-import functools
 import contextlib
 from concurrent import futures
 
@@ -39,18 +38,6 @@ class HashDescriptor:
     def __init__(self, fileno, digestsize):
         self.fileno = fileno
         self.digestsize = digestsize
-
-    @property
-    @functools.lru_cache(maxsize=None)
-    def pipe_max_size(self):
-        try:
-            with open('/proc/sys/fs/pipe-max-size') as fp:
-                return int(fp.read().strip())
-        except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise
-        # default number of pages is 16 since kernel 2.6.11
-        return os.sysconf(os.sysconf_names['SC_PAGESIZE']) * 16
 
     @staticmethod
     def _read(fileno, size):
@@ -82,7 +69,7 @@ class HashDescriptor:
 
     def digest(self, fileno):
         with self._pipe() as (rfd, wfd):
-            mvlen = fcntl.fcntl(wfd, self.F_SETPIPE_SZ, self.pipe_max_size)
+            mvlen = fcntl.fcntl(wfd, self.F_GETPIPE_SZ)
             flags = self.SPLICE_F_MOVE | self.SPLICE_F_MORE
 
             while True:
